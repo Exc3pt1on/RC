@@ -1,106 +1,100 @@
 import time
 import RPi.GPIO as GPIO
-import time
-
+import threading
 from flask import Flask, render_template, request
 app = Flask(__name__)
 
-def dist():
-
-    #LEFT
-    GPIO.output(TRIG_L, 1)
-    time.sleep(0.00001)
-    GPIO.output(TRIG_L, 0)
-
-    while GPIO.input(ECHO_L) == 0:
-        pass
-
-    start = time.time()
-
-    while GPIO.input(ECHO_L) == 1:
-        pass
-    stop = time.time()
-    distance = (stop - start) * 17000
-    left = distance
-
-    #CENTER
-    GPIO.output(TRIG_S, 1)
-    time.sleep(0.00001)
-    GPIO.output(TRIG_S, 0)
-
-    while GPIO.input(ECHO_S) == 0:
-        pass
-
-    start = time.time()
-
-    while GPIO.input(ECHO_S) == 1:
-        pass
-    stop = time.time()
-
-    distance = (stop - start) * 17000
-    center = distance
-
-    #RIGTH
-    GPIO.output(TRIG_R, 1)
-    time.sleep(0.00001)
-    GPIO.output(TRIG_R, 0)
-
-    while GPIO.input(ECHO_R) == 0:
-        pass
-
-    start = time.time()
-
-    while GPIO.input(ECHO_R) == 1:
-        pass
-    stop = time.time()
-
-    distance = (stop - start) * 17000
-    right = distance
-    
-    return left, center, right
-
-def main():
-    
-
-    while True:
-
-        left,center,right = dist()
-        if center > 50:
-            gass.ChangeDutyCycle(7.5)
-        else:
-            gass.ChangeDutyCycle(7)
-            time.sleep(1)
-            if left > right:
-                turn.ChangeDutyCycle(5)
-            else:
-                turn.ChangeDutyCycle(9)
-            time.sleep(0.5)
-            gass.ChangeDutyCycle(5)
-            time.sleep(0.2)
-            gass.ChangeDutyCycle(7)
-            time.sleep(0.2)
-            gass.ChangeDutyCycle(6)
-            time.sleep(0.5)
-
-        if center < 200:
-            if (right - 10) > left:
-                turn.ChangeDutyCycle(5)
-            elif (left - 10) > right:
-                turn.ChangeDutyCycle(9)
-            else:
-                turn.ChangeDutyCycle(7)
-        else:
-            if (left < 30) or (right < 30):
-                if left < right:
-                    turn.ChangeDutyCycle(5)
-                else:
-                    turn.ChangeDutyCycle(9)
-            else:
-                turn.ChangeDutyCycle(7)
-
+program_run = False
 
 try:
+    def dist():
 
+        #LEFT
+        error_left = False
+        GPIO.output(TRIG_L, 1)
+        time.sleep(0.00001)
+        GPIO.output(TRIG_L, 0)
+
+        fail_test = time.time()
+
+        while GPIO.input(ECHO_L) == 0:
+            now = time.time()
+            if fail_test - now > 1:
+                error_left = True
+                print('Error sensor left')
+                break
+            pass
+
+        if error_left == False:
+            start = time.time()
+
+            while GPIO.input(ECHO_L) == 1:
+                pass
+            stop = time.time()
+            distance = (stop - start) * 17000
+            left = distance
+        else:
+            left = 50
+
+        #CENTER
+        error_center = False
+        GPIO.output(TRIG_S, 1)
+        time.sleep(0.00001)
+        GPIO.output(TRIG_S, 0)
+
+        fail_test = time.time()
+
+        while GPIO.input(ECHO_S) == 0:
+            now = time.time()
+            if fail_test - now > 1:
+                error_center = True
+                print('Error sensor center')
+                break
+            pass
+
+        if error_center == False:
+            start = time.time()
+
+            while GPIO.input(ECHO_S) == 1:
+                pass
+            stop = time.time()
+
+            distance = (stop - start) * 17000
+            center = distance
+        else:
+            center = 0
+
+        #RIGTH
+        error_right = False
+        GPIO.output(TRIG_R, 1)
+        time.sleep(0.00001)
+        GPIO.output(TRIG_R, 0)
+
+        fail_test = time.time()
+
+        while GPIO.input(ECHO_R) == 0:
+            now = time.time()
+            if fail_test - now > 1:
+                error_right = True
+                print('Error sensor right')
+                break
+            pass
+
+        if error_right == False:
+            start = time.time()
+
+            while GPIO.input(ECHO_R) == 1:
+                pass
+            stop = time.time()
+
+            distance = (stop - start) * 17000
+            right = distance
+        else:
+            right = 50
+
+        return left, center, right
+    
+    
     GPIO.setmode(GPIO.BOARD)
 
     TRIG_L = 3
@@ -134,21 +128,67 @@ try:
     GPIO.setup(24,GPIO.OUT)
     gass = GPIO.PWM(24,50)
     gass.start(0)
-    print ("Startup 4 sek")
+    print ("Starting system")
     time.sleep(2)
 
-    duty = 9
-
-    print(duty)
     gass.ChangeDutyCycle(9)
-
     time.sleep(2)
-
-    print("7")
     gass.ChangeDutyCycle(7)
     turn.ChangeDutyCycle(7)
 
     time.sleep(2)
+
+    def main():
+        global program_run
+        program_run = True
+        
+        speed = 7.5
+
+        while program_run:
+
+            left,center,right = dist()
+
+            #Gass
+            if center > 50:
+                gass.ChangeDutyCycle(speed)
+            elif center == 0:
+                gass.ChangeDutyCycle(7)
+            else:
+                gass.ChangeDutyCycle(7)
+                time.sleep(1)
+                if left > right:
+                    turn.ChangeDutyCycle(5)
+                else:
+                    turn.ChangeDutyCycle(9)
+                time.sleep(0.5)
+                gass.ChangeDutyCycle(5)
+                time.sleep(0.2)
+                gass.ChangeDutyCycle(7)
+                time.sleep(0.2)
+                # gass.ChangeDutyCycle(6)
+                # time.sleep(0.5)
+
+
+            #Steering
+            if center < 200:
+                if (right - 10) > left:
+                    turn.ChangeDutyCycle(5)
+                elif (left - 10) > right:
+                    turn.ChangeDutyCycle(9)
+                else:
+                    turn.ChangeDutyCycle(7)
+            else:
+                if (left < 30) or (right < 30):
+                    if left < right:
+                        turn.ChangeDutyCycle(5)
+                    else:
+                        turn.ChangeDutyCycle(9)
+                else:
+                    turn.ChangeDutyCycle(7)
+
+        #After ended run
+        gass.ChangeDutyCycle(7)
+        turn.ChangeDutyCycle(7)
 
 
 
@@ -161,14 +201,17 @@ try:
     def action(deviceName):
         if deviceName == 'start':
             #run python program
-            main()
+            main_program = threading.Thread(target=main, daemon=True)
+            main_program.start()
+            print('main finished')
         elif deviceName == 'stop':
             #stop python program
-            time.sleep(1)
+            global program_run
+            program_run = False
+            print('stop')
         return render_template('index.html')
     if __name__ == "__main__":
         app.run(host='0.0.0.0', port=80, debug=True)
-
 
 except KeyboardInterrupt: # If CTRL+C is pressed, exit cleanly:
     print("Keyboard interrupt")
@@ -182,4 +225,5 @@ finally:
     time.sleep(0.2)
     turn.stop()
     gass.stop()
-    GPIO.cleanup() # cleanup all GPIO 
+    GPIO.cleanup() # cleanup all GPIO
+    print('done')
