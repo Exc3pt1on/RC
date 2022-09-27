@@ -201,7 +201,7 @@ try:
     def action(deviceName):
         if deviceName == 'start':
             #run python program
-            main_program = threading.Thread(target=main, daemon=True)
+            main_program = threading.Thread(target=main, daemon=True)  #mayby implement thread.is_alive() and not allow multiple to run simultaneously
             main_program.start()
             print('main finished')
         elif deviceName == 'stop':
